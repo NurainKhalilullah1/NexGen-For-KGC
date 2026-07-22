@@ -107,13 +107,10 @@ object InsforgeClient {
                     }
                     Result.success(userObj)
                 } else {
-                    val errMsg = "Insforge Auth Signup Error (${response.code})"
-                    InsforgeErrorHandler.emitError(errMsg)
-                    Result.failure(Exception(errMsg))
+                    Result.failure(Exception("Insforge Auth unavailable (${response.code})"))
                 }
             }
         } catch (e: Exception) {
-            InsforgeErrorHandler.handleNetworkException(e, "registering user")
             Result.failure(e)
         }
     }
@@ -145,13 +142,10 @@ object InsforgeClient {
                 if (userJson != null) {
                     Result.success(userJson)
                 } else {
-                    val errMsg = "Insforge Auth Login Error (${response.code})"
-                    InsforgeErrorHandler.emitError(errMsg)
-                    Result.failure(Exception(errMsg))
+                    Result.failure(Exception("Insforge Auth token error (${response.code})"))
                 }
             }
         } catch (e: Exception) {
-            InsforgeErrorHandler.handleNetworkException(e, "authenticating user")
             Result.failure(e)
         }
     }
@@ -174,12 +168,9 @@ object InsforgeClient {
                     Result.success(null)
                 }
             } else {
-                val errMsg = "Insforge Fetch Error (${response.code})"
-                InsforgeErrorHandler.emitError(errMsg)
-                Result.failure(Exception(errMsg))
+                Result.failure(Exception("Insforge User query HTTP ${response.code}"))
             }
         } catch (e: Exception) {
-            InsforgeErrorHandler.handleNetworkException(e, "fetching user profile")
             Result.failure(e)
         }
     }
@@ -199,17 +190,14 @@ object InsforgeClient {
             }.toString()
 
             val request = newRequestBuilder("/rest/v1/users")
-                .addHeader("Prefer", "resolution=merge-duplicates")
+                .addHeader("Prefer", "return=minimal, resolution=merge-duplicates")
                 .post(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
                 .build()
 
             val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                InsforgeErrorHandler.emitError("Insforge User Sync Error (${response.code})")
-            }
             Result.success(response.isSuccessful)
         } catch (e: Exception) {
-            InsforgeErrorHandler.handleNetworkException(e, "syncing profile")
+            // Silently fallback to Room local database for offline support
             Result.failure(e)
         }
     }
