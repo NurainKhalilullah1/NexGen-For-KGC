@@ -37,7 +37,7 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun NexGenLmsTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false, // Use brand theme for consistency
     content: @Composable () -> Unit
 ) {
