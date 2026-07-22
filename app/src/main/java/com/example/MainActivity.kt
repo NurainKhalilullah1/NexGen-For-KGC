@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
         val db = AppDatabase.getDatabase(applicationContext)
         repository = AppRepository(db, applicationContext)
 
+        com.example.notification.NotificationHelper.createNotificationChannels(applicationContext)
+
         setContent {
             val userRoleStateProvider = remember { UserRoleStateProvider(repository) }
 

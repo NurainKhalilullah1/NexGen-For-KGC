@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserRole
 import com.example.data.repository.AppRepository
+import com.example.notification.NotificationCategory
+import com.example.notification.NotificationHelper
 import com.example.ui.theme.NexGenIndigoPrimary
 import kotlinx.coroutines.launch
 
@@ -48,6 +50,7 @@ fun AuthScreen(
     var showGoogleAuthModal by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         modifier = modifier.fillMaxSize()
@@ -284,6 +287,12 @@ fun AuthScreen(
 
                                     isLoading = false
                                     if (result.isSuccess) {
+                                        NotificationHelper.sendPushNotification(
+                                            context = context,
+                                            title = if (isSignUp) "Welcome to NexGen LMS! 🎉" else "Welcome Back! 👋",
+                                            message = if (isSignUp) "Account created successfully. Explore courses and start learning!" else "Successfully signed in to NexGen LMS.",
+                                            category = NotificationCategory.SYSTEM
+                                        )
                                         onAuthSuccess()
                                     } else {
                                         errorMessage = result.exceptionOrNull()?.message ?: "Authentication failed."

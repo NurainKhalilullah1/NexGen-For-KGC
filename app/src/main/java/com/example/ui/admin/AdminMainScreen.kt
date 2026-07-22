@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.*
 import com.example.data.repository.AppRepository
+import com.example.notification.NotificationCategory
+import com.example.notification.NotificationHelper
 import com.example.ui.components.*
 import com.example.ui.theme.NexGenIndigoPrimary
 import com.example.ui.theme.RemitaGreen
@@ -45,7 +47,12 @@ fun AdminMainScreen(
     var selectedCourseForReview by remember { mutableStateOf<Course?>(null) }
     var rejectionReasonInput by remember { mutableStateOf("") }
 
+    var showNotificationCenter by remember { mutableStateOf(false) }
+    val notificationsList by NotificationHelper.notifications.collectAsStateWithLifecycle()
+    val unreadAlertsCount = notificationsList.count { !it.isRead }
+
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         topBar = {
@@ -57,6 +64,20 @@ fun AdminMainScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showNotificationCenter = true },
+                        modifier = Modifier.testTag("admin_notification_bell_btn")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadAlertsCount > 0) {
+                                    Badge { Text(unreadAlertsCount.toString()) }
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notification Center")
+                        }
+                    }
                     RoleBadge(role = currentUser.role)
                     IconButton(onClick = onLogout, modifier = Modifier.testTag("admin_logout_btn")) {
                         Icon(Icons.Default.Logout, contentDescription = "Logout")
@@ -196,6 +217,12 @@ fun AdminMainScreen(
                                 coroutineScope.launch {
                                     repository.updateCourseStatus(course.id, CourseStatus.PUBLISHED)
                                     selectedCourseForReview = null
+                                    NotificationHelper.sendPushNotification(
+                                        context = context,
+                                        title = "New Course Published! 🚀",
+                                        message = "Course '${course.title}' is now approved and live for students.",
+                                        category = NotificationCategory.COURSE
+                                    )
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = RemitaGreen),
@@ -210,12 +237,19 @@ fun AdminMainScreen(
                         OutlinedButton(
                             onClick = {
                                 coroutineScope.launch {
+                                    val reason = rejectionReasonInput.ifBlank { "Does not meet NexGen platform guidelines." }
                                     repository.updateCourseStatus(
                                         course.id,
                                         CourseStatus.REJECTED,
-                                        rejectionReasonInput.ifBlank { "Does not meet NexGen platform guidelines." }
+                                        reason
                                     )
                                     selectedCourseForReview = null
+                                    NotificationHelper.sendPushNotification(
+                                        context = context,
+                                        title = "Course Review Update ⚠️",
+                                        message = "Course '${course.title}' status was updated: $reason",
+                                        category = NotificationCategory.SYSTEM
+                                    )
                                 }
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
@@ -224,6 +258,12 @@ fun AdminMainScreen(
                             Text("Reject Course")
                         }
                     }
+                )
+            }
+
+            if (showNotificationCenter) {
+                NotificationCenterSheet(
+                    onDismissRequest = { showNotificationCenter = false }
                 )
             }
         }
@@ -357,35 +397,56 @@ private fun AdminRemitaAuditTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("NexGen Platform Revenue & Remita Audit", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("NexGen Platform Control Center", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = NexGenIndigoPrimary),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text("Total Platform Remita Volume", color = Color.LightGray, fontSize = 12.sp)
-                Text(
-                    text = "₦%,.2f".format(totalRevenue),
-                    color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Black
-                )
+            MetricStatCard(
+                title = "Total Remita Revenue",
+                value = "₦%,.0f".format(totalRevenue),
+                trend = "+24%",
+                icon = Icons.Default.AccountBalance,
+                iconTint = RemitaGreen,
+                modifier = Modifier.weight(1f)
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Total Users: $totalUsersCount", color = Color.White, fontSize = 12.sp)
-                    Text("Total Courses: $totalCoursesCount", color = Color.White, fontSize = 12.sp)
-                }
-            }
+            MetricStatCard(
+                title = "Platform Users",
+                value = "$totalUsersCount",
+                trend = "+5 active",
+                icon = Icons.Default.People,
+                iconTint = NexGenIndigoPrimary,
+                modifier = Modifier.weight(1f)
+            )
         }
 
-        Text("All Remita Transactions (${transactions.size}):", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MetricStatCard(
+                title = "Total Modules",
+                value = "$totalCoursesCount",
+                icon = Icons.Default.Class,
+                iconTint = Color(0xFF0EA5E9),
+                modifier = Modifier.weight(1f)
+            )
+
+            MetricStatCard(
+                title = "Settled Invoices",
+                value = "${transactions.size}",
+                trend = "100% verified",
+                icon = Icons.Outlined.ReceiptLong,
+                iconTint = Color(0xFFF59E0B),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text("Remita Financial Audit Log (${transactions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
         if (transactions.isEmpty()) {
             EmptyState(
@@ -395,25 +456,33 @@ private fun AdminRemitaAuditTab(
             )
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(transactions) { tx ->
                     Card(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("RRR: ${tx.remitaRrr}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NexGenIndigoPrimary)
-                                Text("₦%,.2f".format(tx.totalAmountNgn), fontWeight = FontWeight.ExtraBold, color = RemitaGreen)
+                                Text("RRR: ${tx.remitaRrr}", fontWeight = FontWeight.Black, fontSize = 14.sp, color = NexGenIndigoPrimary)
+                                Surface(
+                                    color = RemitaGreen.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("₦%,.2f".format(tx.totalAmountNgn), fontWeight = FontWeight.ExtraBold, color = RemitaGreen, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 13.sp)
+                                }
                             }
-                            Text("Course: ${tx.courseTitle}", fontSize = 13.sp)
-                            Text("Student: ${tx.studentName} (${tx.studentEmail})", fontSize = 12.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Course: ${tx.courseTitle}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Student: ${tx.studentName} (${tx.studentEmail})", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

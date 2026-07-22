@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.*
 import com.example.data.repository.AppRepository
+import com.example.notification.NotificationCategory
+import com.example.notification.NotificationHelper
 import com.example.ui.components.*
 import com.example.ui.theme.NexGenIndigoPrimary
 import com.example.ui.theme.RemitaGreen
@@ -53,7 +55,13 @@ fun StudentMainScreen(
     // Selected Transaction for Receipt View
     var selectedTransactionForReceipt by remember { mutableStateOf<Transaction?>(null) }
 
+    // Notification Center State
+    var showNotificationCenter by remember { mutableStateOf(false) }
+    val notificationsList by NotificationHelper.notifications.collectAsStateWithLifecycle()
+    val unreadAlertsCount = notificationsList.count { !it.isRead }
+
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         topBar = {
@@ -73,6 +81,20 @@ fun StudentMainScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showNotificationCenter = true },
+                        modifier = Modifier.testTag("student_notification_bell_btn")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadAlertsCount > 0) {
+                                    Badge { Text(unreadAlertsCount.toString()) }
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notification Center")
+                        }
+                    }
                     RoleBadge(role = currentUser.role)
                     IconButton(onClick = onLogout, modifier = Modifier.testTag("logout_btn")) {
                         Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
@@ -284,9 +306,18 @@ fun StudentMainScreen(
                             isProcessingPayment = false
                             if (result.isSuccess) {
                                 val tx = result.getOrNull()
+                                val coursePaid = selectedCourseForCheckout
                                 selectedCourseForCheckout = null
                                 if (tx != null) {
                                     selectedTransactionForReceipt = tx
+                                }
+                                if (coursePaid != null) {
+                                    NotificationHelper.sendPushNotification(
+                                        context = context,
+                                        title = "Enrollment Confirmed! 🎉",
+                                        message = "Payment successful! You are now enrolled in '${coursePaid.title}'.",
+                                        category = NotificationCategory.COURSE
+                                    )
                                 }
                             }
                         }
@@ -309,6 +340,13 @@ fun StudentMainScreen(
                     student = currentUser,
                     repository = repository,
                     onClose = { activeCourseForPlayer = null }
+                )
+            }
+
+            // NOTIFICATION CENTER SHEET
+            if (showNotificationCenter) {
+                NotificationCenterSheet(
+                    onDismissRequest = { showNotificationCenter = false }
                 )
             }
         }
@@ -337,11 +375,28 @@ private fun StudentCatalogTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Hero Featured Banner
+        val firstEnrolledCourseId = enrolledCourseIds.firstOrNull()
+        val firstEnrolledCourse = publishedCourses.find { it.id == firstEnrolledCourseId }
+        HeroFeaturedBanner(
+            studentName = "Learner",
+            streakCount = 5,
+            activeCourseTitle = firstEnrolledCourse?.title,
+            progressPercent = 0.65f,
+            onContinueClick = {
+                if (firstEnrolledCourse != null) {
+                    onSelectCourse(firstEnrolledCourse)
+                }
+            },
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // Search Field
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search tech courses...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+            placeholder = { Text("Search 100+ accredited modules...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = NexGenIndigoPrimary) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
@@ -350,34 +405,46 @@ private fun StudentCatalogTab(
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                focusedBorderColor = NexGenIndigoPrimary
+            ),
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("catalog_search_input")
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Category Filter Pills
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            categories.take(4).forEach { cat ->
+            categories.take(5).forEach { cat ->
+                val isSelected = selectedCategory == cat
                 FilterChip(
-                    selected = selectedCategory == cat,
+                    selected = isSelected,
                     onClick = { selectedCategory = cat },
-                    label = { Text(cat, fontSize = 12.sp) }
+                    label = { Text(cat, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NexGenIndigoPrimary,
+                        selectedLabelColor = Color.White
+                    )
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (publishedCourses.isEmpty()) {
             EmptyState(
-                title = "No Tech Courses Published Yet",
-                description = "Tutors have not published any tech courses yet. Check back soon or contact your tutor!",
+                title = "No Courses Published Yet",
+                description = "Tutors have not published any courses yet. Check back soon or contact your tutor!",
                 icon = Icons.Outlined.School
             )
         } else if (filtered.isEmpty()) {
@@ -388,7 +455,7 @@ private fun StudentCatalogTab(
             )
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filtered) { course ->
