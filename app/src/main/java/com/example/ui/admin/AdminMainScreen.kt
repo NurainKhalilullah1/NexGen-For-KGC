@@ -221,7 +221,7 @@ fun AdminMainScreen(
                                         context = context,
                                         title = "New Course Published! 🚀",
                                         message = "Course '${course.title}' is now approved and live for students.",
-                                        category = NotificationCategory.COURSE
+                                        category = NotificationCategory.NEW_COURSE
                                     )
                                 }
                             },

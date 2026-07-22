@@ -3,6 +3,9 @@ package com.example.notification
 import java.util.UUID
 
 enum class NotificationCategory(val label: String) {
+    LEARNING_TIPS("Learning & Tips"),
+    NEW_COURSE("New Course Added"),
+    NEW_LESSON("New Lesson Added"),
     COURSE("Course Updates"),
     ASSIGNMENT("Assignments & Quizzes"),
     ANNOUNCEMENT("Announcements"),

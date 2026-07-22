@@ -22,12 +22,29 @@ object NotificationHelper {
     const val CHANNEL_ID_GENERAL = "nexgen_push_general"
     const val CHANNEL_ID_REMINDERS = "nexgen_push_reminders"
 
+    fun isStudentAllowedCategory(category: NotificationCategory): Boolean {
+        return category == NotificationCategory.LEARNING_TIPS ||
+                category == NotificationCategory.NEW_COURSE ||
+                category == NotificationCategory.NEW_LESSON ||
+                category == NotificationCategory.REMINDER
+    }
+
     private val _notifications = MutableStateFlow<List<PushNotificationItem>>(
         listOf(
             PushNotificationItem(
-                title = "Welcome to NexGen LMS!",
-                message = "Explore courses, access lesson notes, and track your learning progress seamlessly.",
-                category = NotificationCategory.SYSTEM
+                title = "Daily Coding Tip 💡",
+                message = "Break complex programming problems into smaller functions! Practice for 15 minutes today.",
+                category = NotificationCategory.LEARNING_TIPS
+            ),
+            PushNotificationItem(
+                title = "New Course Added! 🚀",
+                message = "Check out 'Python & AI Essentials for Young Developers' in the catalog.",
+                category = NotificationCategory.NEW_COURSE
+            ),
+            PushNotificationItem(
+                title = "New Lesson Released 📖",
+                message = "Lesson 4: 'Building Interactive UI Layouts' has been added to your enrolled course.",
+                category = NotificationCategory.NEW_LESSON
             )
         )
     )

@@ -287,12 +287,11 @@ fun AuthScreen(
 
                                     isLoading = false
                                     if (result.isSuccess) {
-                                        NotificationHelper.sendPushNotification(
-                                            context = context,
-                                            title = if (isSignUp) "Welcome to NexGen LMS! 🎉" else "Welcome Back! 👋",
-                                            message = if (isSignUp) "Account created successfully. Explore courses and start learning!" else "Successfully signed in to NexGen LMS.",
-                                            category = NotificationCategory.SYSTEM
-                                        )
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (isSignUp) "Account created successfully! Welcome to NexGen LMS." else "Signed in successfully. Welcome back!",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
                                         onAuthSuccess()
                                     } else {
                                         errorMessage = result.exceptionOrNull()?.message ?: "Authentication failed."
@@ -401,6 +400,11 @@ fun AuthScreen(
                     )
                     isLoading = false
                     if (result.isSuccess) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Signed in successfully with Google. Welcome back!",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                         onAuthSuccess()
                     } else {
                         errorMessage = result.exceptionOrNull()?.message ?: "Google sign in failed."

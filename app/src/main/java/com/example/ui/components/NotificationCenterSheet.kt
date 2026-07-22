@@ -178,40 +178,39 @@ fun NotificationCenterSheet(
                     onClick = {
                         NotificationHelper.sendPushNotification(
                             context = context,
-                            title = "Test Push Notification 🚀",
-                            message = "NexGen LMS system push notifications are working perfectly on your device!",
-                            category = NotificationCategory.SYSTEM
+                            title = "Learning Tip 💡",
+                            message = "Consistently reviewing notes after lessons boosts long-term tech skill retention!",
+                            category = NotificationCategory.LEARNING_TIPS
                         )
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("send_test_push_btn"),
+                        .testTag("send_tip_push_btn"),
                     colors = ButtonDefaults.buttonColors(containerColor = NexGenIndigoPrimary),
                     contentPadding = PaddingValues(vertical = 10.dp)
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Test Push", fontSize = 13.sp)
+                    Text("Learning Tip", fontSize = 13.sp)
                 }
 
                 OutlinedButton(
                     onClick = {
                         NotificationHelper.sendPushNotification(
                             context = context,
-                            title = "Study Reminder 📚",
-                            message = "Time for your daily learning session! Don't forget to complete your active modules.",
-                            category = NotificationCategory.REMINDER,
-                            channelId = NotificationHelper.CHANNEL_ID_REMINDERS
+                            title = "New Course Added! 🚀",
+                            message = "A brand new accredited course has been published in the catalog.",
+                            category = NotificationCategory.NEW_COURSE
                         )
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("trigger_reminder_btn"),
+                        .testTag("trigger_new_course_btn"),
                     contentPadding = PaddingValues(vertical = 10.dp)
                 ) {
-                    Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reminder", fontSize = 13.sp)
+                    Text("New Course", fontSize = 13.sp)
                 }
             }
 
@@ -316,6 +315,9 @@ fun PushNotificationCard(
     modifier: Modifier = Modifier
 ) {
     val categoryIcon = when (item.category) {
+        NotificationCategory.LEARNING_TIPS -> Icons.Default.Lightbulb
+        NotificationCategory.NEW_COURSE -> Icons.Default.LibraryAdd
+        NotificationCategory.NEW_LESSON -> Icons.Default.VideoLibrary
         NotificationCategory.COURSE -> Icons.Default.Book
         NotificationCategory.ASSIGNMENT -> Icons.Default.Assignment
         NotificationCategory.ANNOUNCEMENT -> Icons.Default.Campaign
@@ -324,6 +326,9 @@ fun PushNotificationCard(
     }
 
     val categoryColor = when (item.category) {
+        NotificationCategory.LEARNING_TIPS -> Color(0xFFFFB300)
+        NotificationCategory.NEW_COURSE -> RemitaGreen
+        NotificationCategory.NEW_LESSON -> NexGenIndigoPrimary
         NotificationCategory.COURSE -> NexGenIndigoPrimary
         NotificationCategory.ASSIGNMENT -> Color(0xFFE65100)
         NotificationCategory.ANNOUNCEMENT -> RemitaGreen

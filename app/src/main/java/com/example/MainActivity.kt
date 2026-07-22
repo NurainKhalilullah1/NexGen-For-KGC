@@ -77,6 +77,14 @@ fun MainAppEntry(repository: AppRepository) {
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val handleLogout = remember(context) {
+        {
+            repository.logout()
+            android.widget.Toast.makeText(context, "Logged out successfully", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.testTag("global_snackbar_host")) },
         modifier = Modifier.fillMaxSize()
@@ -103,19 +111,19 @@ fun MainAppEntry(repository: AppRepository) {
                     UserRole.STUDENT -> StudentMainScreen(
                         repository = repository,
                         currentUser = user,
-                        onLogout = { repository.logout() },
+                        onLogout = handleLogout,
                         modifier = modifier
                     )
                     UserRole.TUTOR -> TutorMainScreen(
                         repository = repository,
                         currentUser = user,
-                        onLogout = { repository.logout() },
+                        onLogout = handleLogout,
                         modifier = modifier
                     )
                     UserRole.SUPER_ADMIN -> AdminMainScreen(
                         repository = repository,
                         currentUser = user,
-                        onLogout = { repository.logout() },
+                        onLogout = handleLogout,
                         modifier = modifier
                     )
                 }
