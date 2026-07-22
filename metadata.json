@@ -1,0 +1,6 @@
+{
+  "name": "NexGen By KGC",
+  "description": "LMS mobile application for young learners to acquire tech skills with role-based navigation, course catalog, lesson player, and tutor dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
