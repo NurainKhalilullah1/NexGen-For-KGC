@@ -72,7 +72,6 @@ class UserRoleStateProvider(private val repository: AppRepository) {
 
     private fun parseRoleString(roleStr: String, email: String): UserRole {
         val uppercase = roleStr.uppercase()
-        if (email == "temitopenurain9@gmail.com") return UserRole.SUPER_ADMIN
         return when {
             uppercase.contains("ADMIN") || uppercase.contains("SUPER") -> UserRole.SUPER_ADMIN
             uppercase.contains("TUTOR") || uppercase.contains("TEACHER") || uppercase.contains("INSTRUCTOR") -> UserRole.TUTOR

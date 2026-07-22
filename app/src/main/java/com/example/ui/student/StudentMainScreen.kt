@@ -1,6 +1,7 @@
 package com.example.ui.student
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -137,7 +138,12 @@ fun StudentMainScreen(
                 3 -> StudentProfileTab(
                     user = currentUser,
                     enrolledCount = myEnrollments.size,
-                    transactionsCount = myTransactions.size
+                    transactionsCount = myTransactions.size,
+                    onUploadAvatar = { imageBytes ->
+                        coroutineScope.launch {
+                            repository.uploadUserProfileAvatar(currentUser, imageBytes)
+                        }
+                    }
                 )
             }
 
@@ -189,7 +195,7 @@ fun StudentMainScreen(
                                 )
                             }
 
-                            Divider()
+                            HorizontalDivider()
 
                             Text("Curriculum Lessons (${lessons.size}):", fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
@@ -583,26 +589,58 @@ private fun StudentInvoicesTab(
 private fun StudentProfileTab(
     user: User,
     enrolledCount: Int,
-    transactionsCount: Int
+    transactionsCount: Int,
+    onUploadAvatar: (ByteArray) -> Unit
 ) {
+    var showAvatarDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer,
-            shape = RoundedCornerShape(32.dp),
-            modifier = Modifier.size(80.dp)
+        Box(
+            contentAlignment = Alignment.BottomEnd,
+            modifier = Modifier.clickable { showAvatarDialog = true }
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(48.dp)
-                )
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(40.dp),
+                modifier = Modifier.size(96.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (user.avatarUrl.isNotBlank()) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "User Avatar",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(80.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(28.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Upload Photo",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
 
@@ -611,7 +649,15 @@ private fun StudentProfileTab(
         Text(user.fullName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(user.email, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
+
+        TextButton(onClick = { showAvatarDialog = true }) {
+            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Upload Profile Image (InsForge Storage)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         RoleBadge(role = user.role)
 
@@ -648,4 +694,71 @@ private fun StudentProfileTab(
             }
         }
     }
+
+    if (showAvatarDialog) {
+        ProfileImageUploadDialog(
+            onDismiss = { showAvatarDialog = false },
+            onConfirmUpload = { imageBytes ->
+                showAvatarDialog = false
+                onUploadAvatar(imageBytes)
+            }
+        )
+    }
+}
+
+@Composable
+fun ProfileImageUploadDialog(
+    onDismiss: () -> Unit,
+    onConfirmUpload: (ByteArray) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CloudUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Upload Profile Image", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    "Upload a new avatar picture to your InsForge Storage bucket ('avatars').",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(36.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Simulate Gallery Image Selection", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                // Generate demo JPEG payload bytes for bucket upload test
+                val dummyBytes = "DEMO_PROFILE_AVATAR_IMAGE_PAYLOAD".toByteArray()
+                onConfirmUpload(dummyBytes)
+            }) {
+                Text("Upload to InsForge Storage")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

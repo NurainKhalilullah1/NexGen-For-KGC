@@ -1,7 +1,6 @@
 package com.example.ui.auth
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,14 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.model.UserRole
 import com.example.data.repository.AppRepository
 import com.example.ui.theme.NexGenIndigoPrimary
@@ -48,6 +45,7 @@ fun AuthScreen(
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var showGoogleAuthModal by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -207,7 +205,7 @@ fun AuthScreen(
                                     value = adminPasscode,
                                     onValueChange = { adminPasscode = it },
                                     label = { Text("Admin Authorization Passcode") },
-                                    placeholder = { Text("Enter Passcode or temitopenurain9@gmail.com") },
+                                    placeholder = { Text("Enter Admin Authorization Passcode") },
                                     leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth().testTag("admin_passcode_input")
@@ -272,12 +270,16 @@ fun AuthScreen(
                                         }
                                         repository.registerUser(
                                             email = email,
+                                            password = password,
                                             fullName = fullName,
                                             requestedRole = selectedRole,
                                             adminPasscode = adminPasscode
                                         )
                                     } else {
-                                        repository.loginUser(email = email)
+                                        repository.loginUser(
+                                            email = email,
+                                            password = password
+                                        )
                                     }
 
                                     isLoading = false
@@ -305,6 +307,61 @@ fun AuthScreen(
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            HorizontalDivider(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "  OR  ",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold
+                            )
+                            HorizontalDivider(modifier = Modifier.weight(1f))
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = { showGoogleAuthModal = true },
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("google_auth_btn")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Surface(
+                                    color = Color(0xFF4285F4),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "G",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Continue with Google",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -319,4 +376,149 @@ fun AuthScreen(
             }
         }
     }
+
+    if (showGoogleAuthModal) {
+        GoogleAuthModalDialog(
+            selectedRole = selectedRole,
+            onDismiss = { showGoogleAuthModal = false },
+            onConfirmGoogleAuth = { googleEmail, googleName ->
+                showGoogleAuthModal = false
+                isLoading = true
+                coroutineScope.launch {
+                    val result = repository.loginWithGoogle(
+                        email = googleEmail,
+                        fullName = googleName,
+                        requestedRole = selectedRole
+                    )
+                    isLoading = false
+                    if (result.isSuccess) {
+                        onAuthSuccess()
+                    } else {
+                        errorMessage = result.exceptionOrNull()?.message ?: "Google sign in failed."
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun GoogleAuthModalDialog(
+    selectedRole: UserRole,
+    onDismiss: () -> Unit,
+    onConfirmGoogleAuth: (email: String, fullName: String) -> Unit
+) {
+    var customEmail by remember { mutableStateOf("") }
+    var customName by remember { mutableStateOf("") }
+    var selectedAccountIndex by remember { mutableIntStateOf(0) }
+
+    val presetAccounts = remember {
+        listOf(
+            "student.learner@gmail.com" to "Alex Johnson (Student)",
+            "tutor.instructor@gmail.com" to "Dr. Sarah Admin (Tutor)",
+            "custom" to "Use another Google Account..."
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = Color(0xFF4285F4),
+                    shape = CircleShape,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("G", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Sign in with Google", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Choose an account to continue to NexGen LMS (${selectedRole.name}):",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                presetAccounts.forEachIndexed { index, (email, label) ->
+                    Card(
+                        onClick = { selectedAccountIndex = index },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedAccountIndex == index) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedAccountIndex == index,
+                                onClick = { selectedAccountIndex = index }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(text = label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                if (email != "custom") {
+                                    Text(text = email, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedAccountIndex == 2) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customName,
+                        onValueChange = { customName = it },
+                        label = { Text("Full Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customEmail,
+                        onValueChange = { customEmail = it },
+                        label = { Text("Google Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val (email, name) = if (selectedAccountIndex == 2) {
+                        (if (customEmail.isBlank()) "user.google@gmail.com" else customEmail) to (if (customName.isBlank()) "Google User" else customName)
+                    } else {
+                        val (accEmail, accLabel) = presetAccounts[selectedAccountIndex]
+                        accEmail to accLabel.substringBefore(" (")
+                    }
+                    onConfirmGoogleAuth(email, name)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4))
+            ) {
+                Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

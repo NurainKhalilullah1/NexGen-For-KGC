@@ -91,7 +91,7 @@ fun RemitaCheckoutDialog(
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        Divider()
+                        HorizontalDivider()
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Row(
@@ -293,7 +293,7 @@ fun RemitaReceiptDialog(
                 ReceiptLineItem("Course Tuition", "₦%,.2f".format(transaction.amountNgn))
                 ReceiptLineItem("Remita Fee", "₦%,.2f".format(transaction.remitaServiceFeeNgn))
 
-                Divider()
+                HorizontalDivider()
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

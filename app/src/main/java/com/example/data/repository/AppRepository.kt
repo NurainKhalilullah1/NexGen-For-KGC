@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.local.AppDatabase
 import com.example.data.model.*
+import com.example.data.remote.CloudinaryClient
 import com.example.data.remote.InsforgeClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,10 +42,9 @@ class AppRepository(private val db: AppDatabase, context: Context) {
         if (!savedUserId.isNullOrEmpty()) {
             CoroutineScope(Dispatchers.IO).launch {
                 showGlobalLoading("Verifying active session...")
-                db.userDao().getUserById(savedUserId).collect { user ->
-                    _currentUser.value = user
-                    hideGlobalLoading()
-                }
+                val user = db.userDao().getUserById(savedUserId).firstOrNull()
+                _currentUser.value = user
+                hideGlobalLoading()
             }
         }
     }
@@ -52,6 +52,7 @@ class AppRepository(private val db: AppDatabase, context: Context) {
     // AUTH OPERATIONS
     suspend fun registerUser(
         email: String,
+        password: String,
         fullName: String,
         requestedRole: UserRole,
         adminPasscode: String = ""
@@ -66,11 +67,10 @@ class AppRepository(private val db: AppDatabase, context: Context) {
 
             val finalRole = when (requestedRole) {
                 UserRole.SUPER_ADMIN -> {
-                    val superAdminEmail = "temitopenurain9@gmail.com"
-                    if (trimmedEmail == superAdminEmail || adminPasscode == "NEXGEN2026" || adminPasscode == "KGCADMIN") {
+                    if (adminPasscode.isNotBlank()) {
                         UserRole.SUPER_ADMIN
                     } else {
-                        return@withContext Result.failure(Exception("Invalid Super Admin passcode or email authorization."))
+                        return@withContext Result.failure(Exception("Super Admin authorization required."))
                     }
                 }
                 UserRole.TUTOR -> UserRole.TUTOR
@@ -88,7 +88,7 @@ class AppRepository(private val db: AppDatabase, context: Context) {
             try {
                 InsforgeClient.signUpWithInsforgeAuth(
                     email = trimmedEmail,
-                    password = "NexGenPassword2026!",
+                    password = password,
                     fullName = fullName.trim(),
                     role = finalRole.name
                 )
@@ -104,13 +104,13 @@ class AppRepository(private val db: AppDatabase, context: Context) {
         }
     }
 
-    suspend fun loginUser(email: String): Result<User> = withContext(Dispatchers.IO) {
+    suspend fun loginUser(email: String, password: String): Result<User> = withContext(Dispatchers.IO) {
         showGlobalLoading("Authenticating & querying Insforge database...")
         try {
             val trimmedEmail = email.trim().lowercase()
 
             // 1. Authenticate with Insforge Auth & check 'users' table for up-to-date role
-            val authResult = InsforgeClient.signInWithInsforgeAuth(trimmedEmail, "NexGenPassword2026!")
+            val authResult = InsforgeClient.signInWithInsforgeAuth(trimmedEmail, password)
             val insforgeResult = InsforgeClient.getUserByEmail(trimmedEmail)
             if (insforgeResult.isSuccess || authResult.isSuccess) {
                 val insforgeJson = insforgeResult.getOrNull() ?: authResult.getOrNull()
@@ -120,7 +120,6 @@ class AppRepository(private val db: AppDatabase, context: Context) {
                     val insforgeName = insforgeJson.optString("full_name", insforgeJson.optString("fullName", "NexGen Learner"))
 
                     val resolvedRole = when {
-                        trimmedEmail == "temitopenurain9@gmail.com" -> UserRole.SUPER_ADMIN
                         insforgeRoleStr.equals("SUPER_ADMIN", ignoreCase = true) || insforgeRoleStr.contains("ADMIN", ignoreCase = true) -> UserRole.SUPER_ADMIN
                         insforgeRoleStr.equals("TUTOR", ignoreCase = true) || insforgeRoleStr.contains("TEACH", ignoreCase = true) -> UserRole.TUTOR
                         else -> UserRole.STUDENT
@@ -309,6 +308,81 @@ class AppRepository(private val db: AppDatabase, context: Context) {
             Result.success(transaction)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun loginWithGoogle(
+        email: String,
+        fullName: String,
+        avatarUrl: String = "",
+        requestedRole: UserRole = UserRole.STUDENT
+    ): Result<User> = withContext(Dispatchers.IO) {
+        showGlobalLoading("Signing in with Google Account...")
+        try {
+            val trimmedEmail = email.trim().lowercase()
+            val existing = db.userDao().getUserByEmail(trimmedEmail)
+
+            val resolvedRole = existing?.role ?: requestedRole
+
+            val userToSave = User(
+                id = existing?.id ?: UUID.randomUUID().toString(),
+                email = trimmedEmail,
+                fullName = fullName.ifBlank { existing?.fullName ?: "Google Learner" },
+                role = resolvedRole,
+                avatarUrl = avatarUrl.ifBlank { existing?.avatarUrl ?: "https://ui-avatars.com/api/?name=${java.net.URLEncoder.encode(fullName, "UTF-8")}&background=4F46E5&color=fff" }
+            )
+
+            db.userDao().insertUser(userToSave)
+            InsforgeClient.syncUserToInsforge(
+                id = userToSave.id,
+                email = userToSave.email,
+                fullName = userToSave.fullName,
+                role = userToSave.role.name
+            )
+
+            setActiveSession(userToSave)
+            Result.success(userToSave)
+        } finally {
+            hideGlobalLoading()
+        }
+    }
+
+    suspend fun uploadUserProfileAvatar(
+        user: User,
+        imageBytes: ByteArray
+    ): Result<User> = withContext(Dispatchers.IO) {
+        showGlobalLoading("Uploading avatar to Cloudinary...")
+        try {
+            // Upload to Cloudinary CDN
+            val uploadResult = CloudinaryClient.uploadAvatarBytes(user.id, imageBytes)
+            val newAvatarUrl = uploadResult.getOrDefault(
+                "https://ui-avatars.com/api/?name=${java.net.URLEncoder.encode(user.fullName, "UTF-8")}&background=4F46E5&color=fff&size=200"
+            )
+
+            // Persist locally in Room
+            val updatedUser = user.copy(avatarUrl = newAvatarUrl)
+            db.userDao().insertUser(updatedUser)
+
+            // Sync avatar URL back to InsForge users table
+            InsforgeClient.updateUserAvatarUrl(user.id, newAvatarUrl)
+
+            // Update the live session
+            setActiveSession(updatedUser)
+            Result.success(updatedUser)
+        } finally {
+            hideGlobalLoading()
+        }
+    }
+
+    suspend fun uploadCourseThumbnail(
+        courseId: String,
+        imageBytes: ByteArray
+    ): Result<String> = withContext(Dispatchers.IO) {
+        showGlobalLoading("Uploading thumbnail to Cloudinary...")
+        try {
+            CloudinaryClient.uploadCourseThumbnail(courseId, imageBytes)
+        } finally {
+            hideGlobalLoading()
         }
     }
 }

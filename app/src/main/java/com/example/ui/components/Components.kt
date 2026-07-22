@@ -307,7 +307,7 @@ fun CourseCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             Spacer(modifier = Modifier.height(12.dp))
 

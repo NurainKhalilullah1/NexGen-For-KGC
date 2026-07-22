@@ -190,7 +190,8 @@ object InsforgeClient {
             }.toString()
 
             val request = newRequestBuilder("/rest/v1/users")
-                .addHeader("Prefer", "return=minimal, resolution=merge-duplicates")
+                .addHeader("Prefer", "return=minimal")
+                .addHeader("Prefer", "resolution=merge-duplicates")
                 .post(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
                 .build()
 
@@ -198,6 +199,23 @@ object InsforgeClient {
             Result.success(response.isSuccessful)
         } catch (e: Exception) {
             // Silently fallback to Room local database for offline support
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUserAvatarUrl(userId: String, avatarUrl: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = JSONObject().apply {
+                put("avatar_url", avatarUrl)
+            }.toString()
+
+            val request = newRequestBuilder("/rest/v1/users?id=eq.$userId")
+                .patch(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            Result.success(response.isSuccessful)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

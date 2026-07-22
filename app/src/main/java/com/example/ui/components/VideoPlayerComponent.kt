@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,7 +23,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.data.model.Lesson
+
+fun extractYouTubeVideoId(url: String): String {
+    if (url.isBlank()) return "dQw4w9WgXcQ"
+    return when {
+        url.contains("v=") -> url.substringAfter("v=").substringBefore("&").substringBefore("?")
+        url.contains("youtu.be/") -> url.substringAfter("youtu.be/").substringBefore("?")
+        url.contains("embed/") -> url.substringAfter("embed/").substringBefore("?")
+        else -> url.trim()
+    }
+}
 
 @Composable
 fun LessonVideoPlayer(
@@ -29,8 +44,32 @@ fun LessonVideoPlayer(
     onNextLesson: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var isPlaying by remember(lesson.id) { mutableStateOf(false) }
-    var currentProgress by remember(lesson.id) { mutableFloatStateOf(0.15f) }
+    var isPlayerActive by remember(lesson.id) { mutableStateOf(false) }
+    val videoId = remember(lesson.youtubeUrl) { extractYouTubeVideoId(lesson.youtubeUrl) }
+
+    val htmlContent = remember(videoId) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body, html { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+                .iframe-container { position: relative; width: 100%; height: 100%; }
+                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+            </style>
+        </head>
+        <body>
+            <div class="iframe-container">
+                <iframe src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&modestbranding=1&rel=0&playsinline=1" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen></iframe>
+            </div>
+        </body>
+        </html>
+        """.trimIndent()
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -40,72 +79,99 @@ fun LessonVideoPlayer(
             .testTag("video_player_card")
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Video Screen Frame
+            // Video Frame Screen
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
+                    .height(230.dp)
                     .background(Color(0xFF0F172A)),
                 contentAlignment = Alignment.Center
             ) {
-                // Background visual
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.PauseCircle else Icons.Default.PlayCircleFilled,
-                        contentDescription = "Play/Pause",
-                        tint = Color.White,
+                if (isPlayerActive) {
+                    AndroidView(
+                        factory = { context ->
+                            WebView(context).apply {
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.mediaPlaybackRequiresUserGesture = false
+                                settings.loadWithOverviewMode = true
+                                settings.useWideViewPort = true
+                                webViewClient = WebViewClient()
+                                webChromeClient = WebChromeClient()
+                                loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "UTF-8", null)
+                            }
+                        },
+                        update = { webView ->
+                            webView.loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "UTF-8", null)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Preview Frame with Tap to Play trigger
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .clickable { isPlaying = !isPlaying }
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = if (isPlaying) "Streaming Lesson Video..." else "Tap to Play Lesson",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Surface(
-                        color = Color(0xFFCC0000), // YouTube Red
-                        shape = RoundedCornerShape(6.dp)
+                            .fillMaxSize()
+                            .clickable { isPlayerActive = true }
+                            .padding(16.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        Icon(
+                            imageVector = Icons.Default.PlayCircleFilled,
+                            contentDescription = "Start Streaming Video",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "Tap to Stream YouTube Video",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Surface(
+                            color = Color(0xFFCC0000), // YouTube Red
+                            shape = RoundedCornerShape(6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.PlayCircle,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "YouTube Stream",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.PlayCircle,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "YouTube Unlisted Stream ($videoId)",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
 
-                // Top Bar overlay with YouTube URL info
+                // Overlay Banner displaying Lesson Title
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.6f))
+                        .background(Color.Black.copy(alpha = 0.7f))
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -133,17 +199,7 @@ fun LessonVideoPlayer(
                 }
             }
 
-            // Scrubbing Progress Bar
-            LinearProgressIndicator(
-                progress = { currentProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = Color.DarkGray
-            )
-
-            // Video Controls Bar
+            // Controls Bar below Video
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,17 +209,18 @@ fun LessonVideoPlayer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { isPlaying = !isPlaying }) {
+                    IconButton(onClick = { isPlayerActive = !isPlayerActive }) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
+                            imageVector = if (isPlayerActive) Icons.Default.Refresh else Icons.Default.PlayArrow,
+                            contentDescription = "Reload Player",
                             tint = Color.White
                         )
                     }
                     Text(
-                        text = if (isPlaying) "02:15 / ${lesson.durationMinutes}:00" else "00:00 / ${lesson.durationMinutes}:00",
+                        text = if (isPlayerActive) "Streaming Active" else "Tap Play to Stream",
                         color = Color.LightGray,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
 

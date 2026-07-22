@@ -164,7 +164,7 @@ fun AdminMainScreen(
                                 Text("Tuition: ₦%,.2f".format(course.priceNgn), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = RemitaGreen)
                             }
 
-                            Divider()
+                            HorizontalDivider()
 
                             Text("Submitted Video Lessons (${lessons.size}):", fontSize = 13.sp, fontWeight = FontWeight.Bold)
 
@@ -309,7 +309,7 @@ private fun AdminUserManagementTab(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Divider()
+                        HorizontalDivider()
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Row(

@@ -317,7 +317,7 @@ private fun TutorCreateCourseTab(
             modifier = Modifier.fillMaxWidth().testTag("course_thumbnail_input")
         )
 
-        Divider()
+        HorizontalDivider()
 
         Text("Add Course Video Lessons", fontSize = 16.sp, fontWeight = FontWeight.Bold)
 

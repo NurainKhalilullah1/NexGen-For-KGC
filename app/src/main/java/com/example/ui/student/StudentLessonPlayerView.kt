@@ -45,7 +45,11 @@ fun StudentLessonPlayerView(
     val currentLesson = lessons.getOrNull(selectedLessonIndex)
 
     val completedList = remember(enrollment?.completedLessonsJson) {
-        enrollment?.completedLessonsJson?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val raw = enrollment?.completedLessonsJson ?: ""
+        // Handle both "[]" default JSON format and "id1,id2" comma-separated format
+        val cleaned = raw.trim().removePrefix("[").removeSuffix("]").trim()
+        if (cleaned.isBlank()) emptyList()
+        else cleaned.split(",").map { it.trim().removeSurrounding("\"") }.filter { it.isNotBlank() }
     }
 
     var notesText by remember(enrollment?.notes) { mutableStateOf(enrollment?.notes ?: "") }
