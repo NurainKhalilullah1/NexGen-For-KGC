@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -44,6 +45,11 @@ fun NotificationCenterSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler {
+        onDismissRequest()
+    }
+
     val context = LocalContext.current
     val notifications by NotificationHelper.notifications.collectAsStateWithLifecycle()
     var selectedCategoryFilter by remember { mutableStateOf<NotificationCategory?>(null) }

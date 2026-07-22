@@ -1,5 +1,6 @@
 package com.example.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -51,6 +52,14 @@ fun AuthScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler(enabled = showGoogleAuthModal) {
+        showGoogleAuthModal = false
+    }
+    BackHandler(enabled = !isSignUp && !showGoogleAuthModal) {
+        isSignUp = true
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize()

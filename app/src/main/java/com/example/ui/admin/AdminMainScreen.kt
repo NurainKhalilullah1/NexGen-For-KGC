@@ -1,5 +1,6 @@
 package com.example.ui.admin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +54,17 @@ fun AdminMainScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler(enabled = selectedCourseForReview != null) {
+        selectedCourseForReview = null
+    }
+    BackHandler(enabled = showNotificationCenter && selectedCourseForReview == null) {
+        showNotificationCenter = false
+    }
+    BackHandler(enabled = selectedTab != 0 && !showNotificationCenter && selectedCourseForReview == null) {
+        selectedTab = 0
+    }
 
     Scaffold(
         topBar = {

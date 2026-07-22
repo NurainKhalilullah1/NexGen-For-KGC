@@ -1,5 +1,6 @@
 package com.example.ui.student
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -62,6 +63,26 @@ fun StudentMainScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler(enabled = activeCourseForPlayer != null) {
+        activeCourseForPlayer = null
+    }
+    BackHandler(enabled = selectedTransactionForReceipt != null && activeCourseForPlayer == null) {
+        selectedTransactionForReceipt = null
+    }
+    BackHandler(enabled = selectedCourseForCheckout != null && selectedTransactionForReceipt == null && activeCourseForPlayer == null) {
+        selectedCourseForCheckout = null
+    }
+    BackHandler(enabled = selectedCourseForDetail != null && selectedCourseForCheckout == null && selectedTransactionForReceipt == null && activeCourseForPlayer == null) {
+        selectedCourseForDetail = null
+    }
+    BackHandler(enabled = showNotificationCenter && selectedCourseForDetail == null && selectedCourseForCheckout == null && selectedTransactionForReceipt == null && activeCourseForPlayer == null) {
+        showNotificationCenter = false
+    }
+    BackHandler(enabled = selectedTab != 0 && !showNotificationCenter && selectedCourseForDetail == null && selectedCourseForCheckout == null && selectedTransactionForReceipt == null && activeCourseForPlayer == null) {
+        selectedTab = 0
+    }
 
     Scaffold(
         topBar = {

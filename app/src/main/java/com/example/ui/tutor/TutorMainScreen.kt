@@ -1,5 +1,6 @@
 package com.example.ui.tutor
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,6 +49,14 @@ fun TutorMainScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler(enabled = showNotificationCenter) {
+        showNotificationCenter = false
+    }
+    BackHandler(enabled = selectedTab != 0 && !showNotificationCenter) {
+        selectedTab = 0
+    }
 
     Scaffold(
         topBar = {

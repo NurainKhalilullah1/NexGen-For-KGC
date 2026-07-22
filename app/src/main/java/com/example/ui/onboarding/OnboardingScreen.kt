@@ -1,5 +1,6 @@
 package com.example.ui.onboarding
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -42,6 +43,11 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     var currentPage by remember { mutableIntStateOf(0) }
+
+    // Mobile navigation keys (System Back button / Gesture Navigation)
+    BackHandler(enabled = currentPage > 0) {
+        currentPage--
+    }
 
     val pages = remember {
         listOf(
