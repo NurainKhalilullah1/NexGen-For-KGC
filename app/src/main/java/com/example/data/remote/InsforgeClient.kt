@@ -189,9 +189,9 @@ object InsforgeClient {
                 put("role", role)
             }.toString()
 
+            // Single Prefer header with both directives avoids the conflicting-header bug
             val request = newRequestBuilder("/rest/v1/users")
-                .addHeader("Prefer", "return=minimal")
-                .addHeader("Prefer", "resolution=merge-duplicates")
+                .addHeader("Prefer", "return=minimal,resolution=merge-duplicates")
                 .post(jsonBody.toRequestBody("application/json".toMediaTypeOrNull()))
                 .build()
 
@@ -199,6 +199,33 @@ object InsforgeClient {
             Result.success(response.isSuccessful)
         } catch (e: Exception) {
             // Silently fallback to Room local database for offline support
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetches the authenticated user's profile from InsForge using an OAuth access token.
+     * Used after the Google OAuth callback to get the real email and name.
+     */
+    suspend fun getUserFromToken(accessToken: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$baseUrl/auth/v1/user")
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $accessToken")
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (response.isSuccessful) {
+                Result.success(JSONObject(responseBody))
+            } else {
+                Result.failure(Exception("InsForge /auth/v1/user error (${response.code}): $responseBody"))
+            }
+        } catch (e: Exception) {
+            InsforgeErrorHandler.handleNetworkException(e, "fetching user from token")
             Result.failure(e)
         }
     }

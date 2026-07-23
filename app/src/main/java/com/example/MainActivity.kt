@@ -1,5 +1,7 @@
 package com.example
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,6 +47,9 @@ class MainActivity : ComponentActivity() {
 
         com.example.notification.NotificationHelper.createNotificationChannels(applicationContext)
 
+        // Handle OAuth redirect that arrives while the app is already running
+        handleOAuthIntent(intent)
+
         setContent {
             val userRoleStateProvider = remember { UserRoleStateProvider(repository) }
 
@@ -55,6 +60,32 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /** Called when the app is already in the foreground and Chrome redirects back via deep-link */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleOAuthIntent(intent)
+    }
+
+    private fun handleOAuthIntent(intent: Intent?) {
+        val data: Uri = intent?.data ?: return
+        if (data.scheme != "nexgen" || data.host != "auth") return
+
+        // InsForge puts the token in the fragment (e.g. nexgen://auth/callback#access_token=xxx)
+        // or as a query param depending on configuration — we check both.
+        val fragment = data.fragment ?: ""
+        val accessToken = fragment
+            .split("&")
+            .firstOrNull { it.startsWith("access_token=") }
+            ?.removePrefix("access_token=")
+            ?: data.getQueryParameter("access_token")
+            ?: return
+
+        // Dispatch asynchronously — MainAppEntry observes oauthResult StateFlow for the outcome
+        kotlinx.coroutines.MainScope().launch {
+            repository.handleGoogleOAuthCallback(accessToken)
+        }
+    }
 }
 
 @Composable
@@ -62,6 +93,7 @@ fun MainAppEntry(repository: AppRepository) {
     val currentUser by repository.currentUser.collectAsStateWithLifecycle()
     val hasCompletedOnboarding by repository.hasCompletedOnboardingFlow.collectAsStateWithLifecycle()
     val globalLoadingState by repository.globalLoadingState.collectAsStateWithLifecycle()
+    val oauthResult by repository.oauthResult.collectAsStateWithLifecycle()
     val roleStateProvider = LocalUserRoleState.current
     val isCheckingInsforgeRole by roleStateProvider?.isCheckingInsforge?.collectAsStateWithLifecycle() ?: remember { androidx.compose.runtime.mutableStateOf(false) }
     val insforgeMessage by roleStateProvider?.verificationMessage?.collectAsStateWithLifecycle() ?: remember { androidx.compose.runtime.mutableStateOf(null) }
@@ -75,6 +107,15 @@ fun MainAppEntry(repository: AppRepository) {
         InsforgeErrorHandler.errorEvents.collect { errorMessage ->
             snackbarHostState.showSnackbar(errorMessage)
         }
+    }
+
+    // Show OAuth error as snackbar; success is handled by currentUser StateFlow changing
+    LaunchedEffect(oauthResult) {
+        val result = oauthResult ?: return@LaunchedEffect
+        if (!result.success) {
+            snackbarHostState.showSnackbar(result.errorMessage ?: "Google Sign-In failed.")
+        }
+        repository.clearOAuthResult()
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current

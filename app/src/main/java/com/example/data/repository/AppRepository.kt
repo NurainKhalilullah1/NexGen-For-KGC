@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import org.json.JSONObject
 
 class AppRepository(private val db: AppDatabase, context: Context) {
 
@@ -19,6 +20,13 @@ class AppRepository(private val db: AppDatabase, context: Context) {
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
+
+    // Carries the result of a completed Google OAuth redirect so the UI can react
+    data class OAuthResult(val success: Boolean, val errorMessage: String? = null)
+    private val _oauthResult = MutableStateFlow<OAuthResult?>(null)
+    val oauthResult: StateFlow<OAuthResult?> = _oauthResult.asStateFlow()
+
+    fun clearOAuthResult() { _oauthResult.value = null }
 
     data class LoadingState(
         val isLoading: Boolean = false,
@@ -49,7 +57,6 @@ class AppRepository(private val db: AppDatabase, context: Context) {
         }
     }
 
-    // AUTH OPERATIONS
     suspend fun registerUser(
         email: String,
         password: String,
@@ -84,19 +91,25 @@ class AppRepository(private val db: AppDatabase, context: Context) {
                 role = finalRole
             )
 
-            // Try registering with Insforge Auth endpoint
-            try {
-                InsforgeClient.signUpWithInsforgeAuth(
-                    email = trimmedEmail,
-                    password = password,
-                    fullName = fullName.trim(),
-                    role = finalRole.name
-                )
-            } catch (e: Exception) {
-                // Insforge Auth fallback handles database sync
-            }
+            // Step 1: Register with InsForge Auth (creates auth.users entry with hashed password)
+            InsforgeClient.signUpWithInsforgeAuth(
+                email = trimmedEmail,
+                password = password,
+                fullName = fullName.trim(),
+                role = finalRole.name
+            )
 
+            // Step 2: Always persist to local Room DB
             db.userDao().insertUser(newUser)
+
+            // Step 3: Guaranteed best-effort sync to InsForge public users table
+            InsforgeClient.syncUserToInsforge(
+                id = newUser.id,
+                email = newUser.email,
+                fullName = newUser.fullName,
+                role = newUser.role.name
+            )
+
             setActiveSession(newUser)
             Result.success(newUser)
         } finally {
@@ -311,25 +324,49 @@ class AppRepository(private val db: AppDatabase, context: Context) {
         }
     }
 
-    suspend fun loginWithGoogle(
-        email: String,
-        fullName: String,
-        avatarUrl: String = "",
+    /**
+     * Called by MainActivity.onNewIntent() when InsForge OAuth redirects back to the app.
+     * Exchanges the access_token for real user info, then creates/updates the local session.
+     */
+    suspend fun handleGoogleOAuthCallback(
+        accessToken: String,
         requestedRole: UserRole = UserRole.STUDENT
-    ): Result<User> = withContext(Dispatchers.IO) {
-        showGlobalLoading("Signing in with Google Account...")
+    ) = withContext(Dispatchers.IO) {
+        showGlobalLoading("Completing Google Sign-In...")
         try {
-            val trimmedEmail = email.trim().lowercase()
-            val existing = db.userDao().getUserByEmail(trimmedEmail)
+            val userInfoResult = InsforgeClient.getUserFromToken(accessToken)
+            val userJson: JSONObject = userInfoResult.getOrElse {
+                _oauthResult.value = OAuthResult(success = false, errorMessage = "Could not retrieve Google profile: ${it.message}")
+                return@withContext
+            }
 
+            val email = userJson.optString("email", "").trim().lowercase()
+            if (email.isEmpty()) {
+                _oauthResult.value = OAuthResult(success = false, errorMessage = "Google account has no email address.")
+                return@withContext
+            }
+
+            // Extract full name from user_metadata (InsForge stores it there for OAuth users)
+            val metadata = userJson.optJSONObject("user_metadata")
+            val fullName = metadata?.optString("full_name", null)
+                ?: metadata?.optString("name", null)
+                ?: userJson.optString("email", "Google User").substringBefore("@")
+
+            val avatarUrl = metadata?.optString("avatar_url", null)
+                ?: metadata?.optString("picture", null)
+                ?: "https://ui-avatars.com/api/?name=${java.net.URLEncoder.encode(fullName, "UTF-8")}&background=4F46E5&color=fff"
+
+            val insforgeUserId = userJson.optString("id", UUID.randomUUID().toString())
+
+            val existing = db.userDao().getUserByEmail(email)
             val resolvedRole = existing?.role ?: requestedRole
 
             val userToSave = User(
-                id = existing?.id ?: UUID.randomUUID().toString(),
-                email = trimmedEmail,
+                id = existing?.id ?: insforgeUserId,
+                email = email,
                 fullName = fullName.ifBlank { existing?.fullName ?: "Google Learner" },
                 role = resolvedRole,
-                avatarUrl = avatarUrl.ifBlank { existing?.avatarUrl ?: "https://ui-avatars.com/api/?name=${java.net.URLEncoder.encode(fullName, "UTF-8")}&background=4F46E5&color=fff" }
+                avatarUrl = avatarUrl
             )
 
             db.userDao().insertUser(userToSave)
@@ -341,7 +378,9 @@ class AppRepository(private val db: AppDatabase, context: Context) {
             )
 
             setActiveSession(userToSave)
-            Result.success(userToSave)
+            _oauthResult.value = OAuthResult(success = true)
+        } catch (e: Exception) {
+            _oauthResult.value = OAuthResult(success = false, errorMessage = e.message ?: "Google Sign-In failed.")
         } finally {
             hideGlobalLoading()
         }

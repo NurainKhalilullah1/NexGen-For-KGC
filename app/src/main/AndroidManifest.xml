@@ -28,6 +28,13 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- InsForge Google OAuth redirect — receives nexgen://auth/callback?access_token=... -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nexgen" android:host="auth" />
+            </intent-filter>
         </activity>
     </application>
 
