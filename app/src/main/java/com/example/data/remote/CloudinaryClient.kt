@@ -29,10 +29,16 @@ import java.util.concurrent.TimeUnit
 object CloudinaryClient {
 
     private val cloudName: String
-        get() = BuildConfig.CLOUDINARY_CLOUD_NAME
+        get() {
+            val raw = try { BuildConfig.CLOUDINARY_CLOUD_NAME } catch (e: Throwable) { "" }
+            return if (raw.isNotBlank()) raw else "dlct4kt1s"
+        }
 
     private val uploadPreset: String
-        get() = BuildConfig.CLOUDINARY_UPLOAD_PRESET
+        get() {
+            val raw = try { BuildConfig.CLOUDINARY_UPLOAD_PRESET } catch (e: Throwable) { "" }
+            return if (raw.isNotBlank()) raw else "nexgenbykgc"
+        }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)

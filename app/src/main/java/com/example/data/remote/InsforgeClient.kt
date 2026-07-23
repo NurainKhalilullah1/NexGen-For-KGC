@@ -15,10 +15,16 @@ object InsforgeClient {
     private val client = OkHttpClient()
 
     val baseUrl: String
-        get() = BuildConfig.INSFORGE_PROJECT_URL.trimEnd('/')
+        get() {
+            val raw = try { BuildConfig.INSFORGE_PROJECT_URL } catch (e: Throwable) { "" }
+            return (if (raw.isNotBlank()) raw else "https://ywy9d5pe.eu-central.insforge.app").trimEnd('/')
+        }
 
     val apiKey: String
-        get() = BuildConfig.INSFORGE_ANON_KEY
+        get() {
+            val raw = try { BuildConfig.INSFORGE_ANON_KEY } catch (e: Throwable) { "" }
+            return if (raw.isNotBlank()) raw else "anon_a5a93998a5fc7576abb114d44780878005623a505a8e821c827b1e3f4532934f"
+        }
 
     private fun newRequestBuilder(endpoint: String): Request.Builder {
         val fullUrl = if (endpoint.startsWith("http")) endpoint else "$baseUrl$endpoint"
