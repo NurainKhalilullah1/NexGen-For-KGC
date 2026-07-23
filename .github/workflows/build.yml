@@ -53,7 +53,7 @@ jobs:
               {
                 "client_info": {
                   "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-                  "android_client_info": { "package_name": "com.aistudio.nexgenlms.app" }
+                  "android_client_info": { "package_name": "com.kgc.nexgenlms.app" }
                 },
                 "api_key": [{ "current_key": "placeholder" }],
                 "services": {}
