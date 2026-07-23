@@ -44,24 +44,36 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        try {
+            enableEdgeToEdge()
 
-        val db = AppDatabase.getDatabase(applicationContext)
-        repository = AppRepository(db, applicationContext)
+            val db = AppDatabase.getDatabase(applicationContext)
+            repository = AppRepository(db, applicationContext)
 
-        com.example.notification.NotificationHelper.createNotificationChannels(applicationContext)
+            com.example.notification.NotificationHelper.createNotificationChannels(applicationContext)
 
-        // Handle OAuth redirect that arrives while the app is already running
-        handleOAuthIntent(intent)
+            // Handle OAuth redirect that arrives while the app is already running
+            handleOAuthIntent(intent)
 
-        setContent {
-            val userRoleStateProvider = remember { UserRoleStateProvider(repository) }
+            setContent {
+                val userRoleStateProvider = remember { UserRoleStateProvider(repository) }
 
-            NexGenLmsTheme {
-                CompositionLocalProvider(LocalUserRoleState provides userRoleStateProvider) {
-                    MainAppEntry(repository = repository)
+                NexGenLmsTheme {
+                    CompositionLocalProvider(LocalUserRoleState provides userRoleStateProvider) {
+                        MainAppEntry(repository = repository)
+                    }
                 }
             }
+        } catch (t: Throwable) {
+            val tv = android.widget.TextView(this).apply {
+                text = "STARTUP ERROR:\n${t.javaClass.name}: ${t.message}\n\n${t.stackTraceToString()}"
+                textSize = 13f
+                setPadding(32, 64, 32, 32)
+                setTextColor(android.graphics.Color.RED)
+                setBackgroundColor(android.graphics.Color.BLACK)
+                movementMethod = android.text.method.ScrollingMovementMethod()
+            }
+            setContentView(tv)
         }
     }
 
