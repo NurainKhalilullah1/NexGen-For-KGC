@@ -3,6 +3,8 @@ package com.example
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
@@ -41,6 +43,32 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: AppRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // --- TEMPORARY DEBUG: Catch all crashes and show them on screen ---
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            val msg = buildString {
+                appendLine("CRASH: ${throwable.javaClass.simpleName}")
+                appendLine(throwable.message ?: "(no message)")
+                appendLine("---")
+                throwable.stackTrace.take(8).forEach { appendLine(it.toString()) }
+            }
+            // Write to a file so it survives the crash
+            try {
+                val file = java.io.File(filesDir, "last_crash.txt")
+                file.writeText(msg)
+            } catch (_: Exception) {}
+            // Show a dialog on the main thread before the process dies
+            Handler(Looper.getMainLooper()).post {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("App Crash Detected")
+                    .setMessage(msg)
+                    .setPositiveButton("OK") { _, _ -> defaultHandler?.uncaughtException(thread, throwable) }
+                    .setCancelable(false)
+                    .show()
+            }
+        }
+        // -----------------------------------------------------------------
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
