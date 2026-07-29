@@ -1,0 +1,3 @@
+## 2026-07-29 - Android Compose Forms UX & Input Types
+**Learning:** In Android Compose, text fields defaults to a generic keyboard format lacking 'Next' or 'Done' functionality. This creates a disjointed user flow and negatively impacts a11y for those relying on screen readers or physical keyboards. Proper use of KeyboardOptions drastically changes user interaction patterns.
+**Action:** When working on Android applications using Jetpack Compose, ensure that any `TextField` or `OutlinedTextField` utilizes the `keyboardOptions` property. Assign semantic `KeyboardType` (Email, Password, Text, Number, etc) and flow-based `ImeAction` (Next, Done, Search). Always verify this when touching form views.
